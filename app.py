@@ -1,7 +1,7 @@
 import json
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 import flask
-from message_helper import get_text_message_input, send_message
+from message_helper import get_templated_message_input, get_text_message_input, send_message
 from flights import get_flights
 
  
@@ -26,3 +26,12 @@ async def welcome():
 @app.route("/catalog")
 def catalog():
     return render_template('catalog.html', title='Flight Confirmation Demo for Python', flights=get_flights())
+
+@app.route("/buy-ticket", methods=['POST'])
+async def buy_ticket():
+  flight_id = int(request.form.get("id"))
+  flights = get_flights()
+  flight = next(filter(lambda f: f['flight_id'] == flight_id, flights), None)
+  data = get_templated_message_input(app.config['RECIPIENT_WAID'], flight)
+  await send_message(data)
+  return flask.redirect(flask.url_for('catalog'))

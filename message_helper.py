@@ -35,3 +35,47 @@ def get_text_message_input(recipient, text):
         "body": text
     }
   })
+  
+def get_templated_message_input(recipient, flight):
+  return json.dumps({
+    "messaging_product": "whatsapp",
+    "to": recipient,
+    "type": "template",
+    "template": {
+      "name": "sample_flight_confirmation",
+      "language": {
+        "code": "en_US"
+      },
+      "components": [
+        {
+          "type": "header",
+          "parameters": [
+            {
+              "type": "document",
+              "document": {
+                "filename": "FlightConfirmation.pdf",
+                "link": flight['document']
+              }
+            }
+          ]
+        },
+        {
+          "type": "body",
+          "parameters": [
+            {
+              "type": "text",
+              "text": flight['origin']
+            },
+            {
+              "type": "text",
+              "text": flight['destination']
+            },
+            {
+              "type": "text",
+              "text": flight['time']
+            }
+          ]
+        }
+      ]
+    }
+  })
