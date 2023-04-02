@@ -1,4 +1,5 @@
 import json
+import os
 from flask import Flask, render_template, request
 import flask
 from message_helper import get_templated_message_input, get_text_message_input, send_message
@@ -9,6 +10,9 @@ app = Flask(__name__)
  
 with open('config.json') as f:
     config = json.load(f)
+
+access_token = os.environ.get('ACCESS_TOKEN')
+config['ACCESS_TOKEN'] = access_token
  
 app.config.update(config)
  
