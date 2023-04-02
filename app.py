@@ -43,7 +43,7 @@ async def buy_ticket():
   return flask.redirect(flask.url_for('catalog'))
 
 
-@app.route('/webhook', methods=['POST'])
+@app.route('/webhook', methods=['GET'])
 def webhook_verification():
     if request.args.get('hub.verify_token') == '12345':
         return request.args.get('hub.challenge')
