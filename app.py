@@ -42,10 +42,19 @@ async def buy_ticket():
   await send_message(data)
   return flask.redirect(flask.url_for('catalog'))
 
+def handle_whatsapp_messages(message_data):
+    message = message_data['messages'][0]
+    text = message['text']
+    print(f"Received message: {text}")
 
-@app.route('/webhook', methods=['GET'])
+#@app.route('/webhook', methods=['GET'])
+#def webhook_verification():
+#    if request.args.get('hub.verify_token') == '12345':
+#        return request.args.get('hub.challenge')
+#    return "Error verifying token"
+
+@app.route('/webhook', methods=['POST'])
 def webhook_verification():
-    if request.args.get('hub.verify_token') == '12345':
-        return request.args.get('hub.challenge')
-    return "Error verifying token"
-
+    message_data = request.get_json()
+    handle_whatsapp_messages(message_data)
+    return "ok"
