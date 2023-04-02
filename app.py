@@ -44,6 +44,11 @@ async def buy_ticket():
 
 
 @app.route('/webhook', methods=['POST'])
+def webhook_verification():
+    if request.args.get('hub.verify_token') == '<YOUR_VERIFY_TOKEN>':
+        return request.args.get('hub.challenge')
+    return "Error verifying token"
+    
 def webhook():
     # obtener el cuerpo de la solicitud
     body = request.get_data()
