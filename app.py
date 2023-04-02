@@ -1,9 +1,11 @@
 import json
 import os
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 import flask
 from message_helper import get_templated_message_input, get_text_message_input, send_message
 from flights import get_flights
+import hmac
+import hashlib
 
  
 app = Flask(__name__)
@@ -39,3 +41,41 @@ async def buy_ticket():
   data = get_templated_message_input(app.config['RECIPIENT_WAID'], flight)
   await send_message(data)
   return flask.redirect(flask.url_for('catalog'))
+
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    # obtener el cuerpo de la solicitud
+    body = request.get_data()
+
+    # obtener el encabezado de autenticación
+    auth_header = request.headers.get('X-Hub-Signature-256')
+
+    # verificar la firma HMAC
+    secret = '12345'
+    expected_signature = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+    if not hmac.compare_digest('sha256=' + expected_signature, auth_header):
+        return jsonify({'error': 'Firma inválida'}), 400
+
+    # procesar el cuerpo de la solicitud
+    data = request.get_json()
+    if data.get('event') == 'message':
+        message = data.get('payload').get('text')
+        sender = data.get('sender').get('wa_id')
+        
+        # tu código para manejar el mensaje entrante aquí
+
+    # enviar una respuesta automatizada
+    response = {
+        'recipient': {
+            'wa_id': sender
+        },
+        'message': {
+            'text': 'Gracias por tu mensaje: ' + message
+        }
+    }
+    return jsonify(response), 200
+
+
+    # tu código para manejar la solicitud POST aquí
