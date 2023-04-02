@@ -2,6 +2,8 @@ import json
 from flask import Flask, render_template
 import flask
 from message_helper import get_text_message_input, send_message
+from flights import get_flights
+
  
 app = Flask(__name__)
  
@@ -19,4 +21,8 @@ async def welcome():
   data = get_text_message_input(app.config['RECIPIENT_WAID']
                                 , 'Welcome to the Flight Confirmation Demo App for Python!');
   await send_message(data)
-  return flask.redirect(flask.url_for('index'))
+  return flask.redirect(flask.url_for('catalog'))
+
+@app.route("/catalog")
+def catalog():
+    return render_template('catalog.html', title='Flight Confirmation Demo for Python', flights=get_flights())
