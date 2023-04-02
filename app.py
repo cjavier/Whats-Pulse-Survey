@@ -45,42 +45,7 @@ async def buy_ticket():
 
 @app.route('/webhook', methods=['POST'])
 def webhook_verification():
-    if request.args.get('hub.verify_token') == '<YOUR_VERIFY_TOKEN>':
+    if request.args.get('hub.verify_token') == '12345':
         return request.args.get('hub.challenge')
     return "Error verifying token"
-    
-def webhook():
-    # obtener el cuerpo de la solicitud
-    body = request.get_data()
 
-    # obtener el encabezado de autenticación
-    auth_header = request.headers.get('X-Hub-Signature-256')
-
-    # verificar la firma HMAC
-    secret = '12345'
-    expected_signature = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-
-    if not hmac.compare_digest('sha256=' + expected_signature, auth_header):
-        return jsonify({'error': 'Firma inválida'}), 400
-
-    # procesar el cuerpo de la solicitud
-    data = request.get_json()
-    if data.get('event') == 'message':
-        message = data.get('payload').get('text')
-        sender = data.get('sender').get('wa_id')
-        
-        # tu código para manejar el mensaje entrante aquí
-
-    # enviar una respuesta automatizada
-    response = {
-        'recipient': {
-            'wa_id': sender
-        },
-        'message': {
-            'text': 'Gracias por tu mensaje: ' + message
-        }
-    }
-    return jsonify(response), 200
-
-
-    # tu código para manejar la solicitud POST aquí
