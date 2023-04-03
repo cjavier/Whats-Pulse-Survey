@@ -6,17 +6,18 @@ from message_helper import get_templated_message_input, get_text_message_input, 
 from flights import get_flights
 import hmac
 import hashlib
+from config import config
+
 
  
 app = Flask(__name__)
  
 with open('config.json') as f:
     config = json.load(f)
-
-access_token = os.environ.get('ACCESS_TOKEN')
-config['ACCESS_TOKEN'] = access_token
- 
+#app.config.update(config)
 app.config.update(config)
+
+
  
 @app.route("/")
 def index():
