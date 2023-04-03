@@ -7,3 +7,4 @@ config = {
   "VERSION": "v16.0",
   "PHONE_NUMBER_ID": "108403855354565",
   "ACCESS_TOKEN": os.environ.get('ACCESS_TOKEN')
+  }
