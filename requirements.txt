@@ -3,3 +3,5 @@ requests
 gunicorn
 aiohttp
 asgiref
+aioflask
+firebase-admin

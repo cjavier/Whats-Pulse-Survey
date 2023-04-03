@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1019715487749",
+    "project_id": "whats-pulse-survey",
+    "storage_bucket": "whats-pulse-survey.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1019715487749:android:fcb0741218fefcd4b5f46c",
+        "android_client_info": {
+          "package_name": "whatspulse.flask"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1019715487749-ttib1dnqlahnafap6obn8ajm6e64mmt0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwZPxXygs_d3NJ2CVN3RjvFgxM_F-SzGI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1019715487749-ttib1dnqlahnafap6obn8ajm6e64mmt0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,6 +1,6 @@
 import json
 import os
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import flask
 from message_helper import get_templated_message_input, get_text_message_input, send_message
 from flights import get_flights
@@ -8,22 +8,68 @@ import hmac
 import hashlib
 from config import config
 import traceback
+import firebase_admin
+from firebase_admin import auth, credentials
+from google.oauth2 import id_token
+from google.auth.transport import requests
 
 
 
  
+cred = credentials.Certificate("whats-pulse-survey-firebase-adminsdk-ukg3l-7918253004.json")  # Reemplaza con la ruta al archivo de clave privada de Firebase.
+firebase_admin.initialize_app(cred)
+
 app = Flask(__name__)
+app.secret_key = 'asdf93kasf83q98ccqh9'  # Reemplaza con una clave secreta para proteger las sesiones.
  
 with open('config.json') as f:
     config = json.load(f)
 #app.config.update(config)
 app.config.update(config)
 
-
- 
 @app.route("/")
 def index():
     return render_template('index.html', name=__name__)
+
+#google firebase autentication
+@app.route('/login', methods=['POST'])
+def login():
+    token = request.form.get('idtoken')
+    if not token:
+        print("Token vacío")
+        return redirect(url_for('index'))
+    try:
+        decoded_token = auth.verify_id_token(token)
+        uid = decoded_token['uid']
+        user = auth.get_user(uid)
+        session['user_id'] = user.uid
+        return flask.redirect(flask.url_for('catalog'))
+    except Exception as e:
+        print(e)
+        return redirect(url_for('index'))
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+#google firebase create new users
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        display_name = request.form['display_name']
+        try:
+            user = auth.create_user(
+                email=email,
+                password=password,
+                display_name=display_name
+            )
+            return f"Usuario registrado con éxito: {user.uid}"
+        except Exception as e:
+            print(e)
+            return "Error al registrar el usuario.", 400
+    return render_template('register.html')
+ 
  
 @app.route('/welcome', methods=['POST'])
 async def welcome():
@@ -49,9 +95,13 @@ async def buy_ticket():
   
   try:
       await send_message(data)
+      print(f"Access token: {config['ACCESS_TOKEN']}")
+      print(f"Recipient waid: {config['RECIPIENT_WAID']}")
   except Exception as e:
       traceback.print_exc()
       print(f"Error sending message: {e}")
+      print(f"Access token: {config['ACCESS_TOKEN']}")
+
   
   return flask.redirect(flask.url_for('catalog'))
 
