@@ -7,6 +7,8 @@ from flights import get_flights
 import hmac
 import hashlib
 from config import config
+import traceback
+
 
 
  
@@ -25,10 +27,14 @@ def index():
  
 @app.route('/welcome', methods=['POST'])
 async def welcome():
-  data = get_text_message_input(app.config['RECIPIENT_WAID']
-                                , 'Welcome to the Flight Confirmation Demo App for Python!');
-  await send_message(data)
-  return flask.redirect(flask.url_for('catalog'))
+    data = get_text_message_input(app.config['RECIPIENT_WAID'], 'Welcome to the Flight Confirmation Demo App for Python!')
+    try:
+        await send_message(data)
+    except Exception as e:
+        traceback.print_exc()
+        print(f"Error sending message: {e}")
+    return flask.redirect(flask.url_for('catalog'))
+
 
 @app.route("/catalog")
 def catalog():
@@ -40,7 +46,13 @@ async def buy_ticket():
   flights = get_flights()
   flight = next(filter(lambda f: f['flight_id'] == flight_id, flights), None)
   data = get_templated_message_input(app.config['RECIPIENT_WAID'], flight)
-  await send_message(data)
+  
+  try:
+      await send_message(data)
+  except Exception as e:
+      traceback.print_exc()
+      print(f"Error sending message: {e}")
+  
   return flask.redirect(flask.url_for('catalog'))
 
 def handle_whatsapp_messages(message_data):
@@ -59,3 +71,6 @@ def webhook_verification():
     message_data = request.get_json()
     handle_whatsapp_messages(message_data)
     return "ok"
+
+
+#os.environ.get('ACCESS_TOKEN')
