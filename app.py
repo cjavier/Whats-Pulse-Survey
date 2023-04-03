@@ -14,9 +14,20 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 
 
-
+cred_dict = {
+  "type": "service_account",
+  "project_id": os.environ["PROJECT_ID"],
+  "private_key_id": os.environ["PRIVATE_KEY_ID"],
+    "private_key": os.environ["PRIVATE_KEY"].replace('\\n', '\n'),
+    "client_email": os.environ["CLIENT_EMAIL"],
+  "client_id": "115853760336082885268",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-ukg3l%40whats-pulse-survey.iam.gserviceaccount.com"
+}
  
-cred = credentials.Certificate("whats-pulse-survey-firebase-adminsdk-ukg3l-7918253004.json")  # Reemplaza con la ruta al archivo de clave privada de Firebase.
+cred = credentials.Certificate(cred_dict)  # Reemplaza con la ruta al archivo de clave privada de Firebase.
 firebase_admin.initialize_app(cred)
 
 app = Flask(__name__)
@@ -24,8 +35,8 @@ app.secret_key = 'asdf93kasf83q98ccqh9'  # Reemplaza con una clave secreta para 
  
 with open('config.json') as f:
     config = json.load(f)
-#app.config.update(config)
 app.config.update(config)
+config['ACCESS_TOKEN'] = os.environ['ACCESS_TOKEN']
 
 @app.route("/")
 def index():
@@ -106,9 +117,15 @@ async def buy_ticket():
   return flask.redirect(flask.url_for('catalog'))
 
 def handle_whatsapp_messages(message_data):
-    message = message_data['messages'][0]
-    text = message['text']
-    print(f"Received message: {text}")
+    if 'messages' in message_data:  # Verifica si hay mensajes entrantes
+        messages = message_data['messages']
+        for message in messages:
+            if 'from' in message and 'text' in message:
+                sender = message['from']
+                text = message['text']['body']
+                print(f'Mensaje recibido de {sender}: {text}')
+            else:
+                print('No se pudo procesar el mensaje:', message)
 
 #@app.route('/webhook', methods=['GET'])
 #def webhook_verification():
