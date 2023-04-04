@@ -2,7 +2,7 @@ import json
 import os
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import flask
-from message_helper import get_templated_message_input, get_text_message_input, send_message
+from message_helper import get_templated_message_input, get_text_message_input, send_message, send_quick_reply_message
 from flights import get_flights
 import hmac
 import hashlib
@@ -108,10 +108,10 @@ def catalog():
 
 @app.route("/buy-ticket", methods=['POST'])
 async def buy_ticket():
-  flight_id = int(request.form.get("id"))
-  flights = get_flights()
-  flight = next(filter(lambda f: f['flight_id'] == flight_id, flights), None)
-  data = get_templated_message_input(app.config['RECIPIENT_WAID'], flight)
+  recipient_phone_number = app.config['RECIPIENT_WAID']
+  text = "Por favor, selecciona una opción:"
+  options = ["Opción 1", "Opción 2", "Opción 3"]
+  data = send_quick_reply_message(recipient_phone_number, text, options)
 
   try:
       await send_message(data)

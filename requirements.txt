@@ -5,3 +5,4 @@ aiohttp
 asgiref
 aioflask
 firebase-admin
+google-cloud-firestore

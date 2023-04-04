@@ -50,3 +50,52 @@ def get_templated_message_input(recipient, flight):
     }
 }
   )
+
+def send_quick_reply_message(to_phone_number, text, options):
+    return json.dumps(
+    {
+   "messaging_product": "whatsapp",
+   "to": to_phone_number,
+   "type": "template",
+   "template": {
+       "name": "sample_issue_resolution",
+       "language": {
+           "code": "en_US",
+           "policy": "deterministic"
+       },
+       "components": [
+           {
+               "type": "body",
+               "parameters": [
+                   {
+                       "type": "text",
+                       "text": "*Mr. Jones*"
+                   }
+               ]
+           },
+           {
+               "type": "button",
+               "sub_type": "quick_reply",
+               "index": 0,
+               "parameters": [
+                   {
+                       "type": "text",
+                       "text": "Yes"
+                   }
+               ]
+           },
+           {
+               "type": "button",
+               "sub_type": "quick_reply",
+               "index": 1,
+               "parameters": [
+                   {
+                       "type": "text",
+                       "text": "No"
+                   }
+               ]
+           }
+       ]
+   }
+}
+  )
