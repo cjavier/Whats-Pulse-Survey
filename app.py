@@ -51,6 +51,10 @@ app.config['ACCESS_TOKEN'] = os.environ['ACCESS_TOKEN']
 def index():
     return render_template('index.html', name=__name__)
 
+@app.route("/welcome")
+def welcome():
+    return render_template('welcome.html')
+
 #google firebase autentication
 @app.route('/login', methods=['POST'])
 def login():
@@ -90,16 +94,23 @@ def register():
             return "Error al registrar el usuario.", 400
     return render_template('register.html')
  
- 
-@app.route('/welcome', methods=['POST'])
-async def welcome():
-    data = get_text_message_input(app.config['RECIPIENT_WAID'], 'Welcome to the Flight Confirmation Demo App for Python!')
-    try:
-        await send_message(data)
-    except Exception as e:
-        traceback.print_exc()
-        print(f"Error sending message: {e}")
-    return flask.redirect(flask.url_for('catalog'))
+
+@app.route('/employees')
+def employees():
+    company_id = 'eWLE0uvjozhAAq5giKIA'  # Replace this with the actual company ID
+    employees = get_company_employees(company_id)
+    return render_template('employees.html', employees=employees)
+
+def get_company_employees(company_id):
+    db = firestore.Client()
+    employees_ref = db.collection('companies').document(company_id).collection('employees')
+    employees = employees_ref.stream()
+
+    employees_list = []
+    for employee in employees:
+        employees_list.append(employee.to_dict())
+
+    return employees_list
 
 
 @app.route("/catalog")
@@ -146,21 +157,44 @@ def handle_whatsapp_messages(message_data):
                                     name = None
                                     if 'contacts' in value and len(value['contacts']) > 0:
                                         name = value['contacts'][0]['profile']['name']
-                                    # Check if the text contains a company ID preceded by '@'
-                                    company_id = None
-                                    at_index = text.find('@')
-                                    if at_index != -1:
-                                        company_id_candidate = text[at_index + 1:]
-                                        if company_id_candidate.isalnum():  # Check if the string after '@' is alphanumeric
-                                            company_id = company_id_candidate
-                                    if text[0].isdigit():
-                                        company_id = 'eWLE0uvjozhAAq5giKIA'  # Replace this with the actual company ID
+                                    # Find the company ID by looking for an existing employee with the wa_id
+                                    company_id = find_company_id_by_wa_id(sender)
+                                    if company_id is None:
+                                        # Code to handle when the wa_id is not found in any company
+                                        # Check if the text contains a company ID preceded by '@'
+                                        company_id = None
+                                        at_index = text.find('@')
+                                        if at_index != -1:
+                                            company_id_candidate = text[at_index + 1:]
+                                            if company_id_candidate.isalnum():  # Check if the string after '@' is alphanumeric
+                                                company_id = company_id_candidate
+                                        # Call store_employee_message to store the sender's information
+                                        if name and company_id:
+                                            store_employee_message(company_id, name, sender)
+                                    else:
+                                        # Code to handle when the wa_id is found and the company_id is available
                                         store_survey_answer(company_id, sender, text)
-                                    # Call store_employee_message to store the sender's information
-                                    elif name and company_id:
-                                        store_employee_message(company_id, name, sender)
+                                        pass
+                                    
                                 else:
                                     print('No se pudo procesar el mensaje:', message)
+
+
+def find_company_id_by_wa_id(wa_id):
+    db = firestore.Client()
+    companies_ref = db.collection('companies')
+    companies = companies_ref.stream()
+
+    for company in companies:
+        company_id = company.id
+        employees_ref = db.collection('companies').document(company_id).collection('employees')
+        employees = employees_ref.where('wa_id', '==', wa_id).stream()
+
+        for employee in employees:
+            return company_id
+
+    return None
+
 
 #@app.route('/webhook', methods=['GET'])
 #def webhook_verification():
@@ -198,8 +232,8 @@ def store_employee_message(company_id, name, wa_id):
 
 def store_survey_answer(company_id, wa_id, answer):
     db = firestore.Client()
-    doc_ref = db.collection('companies').document(company_id).collection('survey_answers').document()
-    doc_ref.set({
+    doc_ref = db.collection('companies').document(company_id).collection('survey_answers')
+    doc_ref.add({
         'wa_id': wa_id,
         'answer': answer
     })
