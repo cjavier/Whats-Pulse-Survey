@@ -116,15 +116,24 @@ async def buy_ticket():
   return flask.redirect(flask.url_for('catalog'))
 
 def handle_whatsapp_messages(message_data):
-    if 'messages' in message_data:  # Verifica si hay mensajes entrantes
-        messages = message_data['messages']
-        for message in messages:
-            if 'from' in message and 'text' in message:
-                sender = message['from']
-                text = message['text']['body']
-                print(f'Mensaje recibido de {sender}: {text}')
-            else:
-                print('No se pudo procesar el mensaje:', message)
+    if 'entry' in message_data:
+        entries = message_data['entry']
+        for entry in entries:
+            if 'changes' in entry:
+                changes = entry['changes']
+                for change in changes:
+                    if 'value' in change:
+                        value = change['value']
+                        if 'messages' in value:
+                            messages = value['messages']
+                            for message in messages:
+                                if 'from' in message and 'text' in message:
+                                    sender = message['from']
+                                    text = message['text']['body']
+                                    print(f'Mensaje recibido de {sender}: {text}')
+                                else:
+                                    print('No se pudo procesar el mensaje:', message)
+
 
 #@app.route('/webhook', methods=['GET'])
 #def webhook_verification():
