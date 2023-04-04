@@ -103,7 +103,7 @@ async def buy_ticket():
   flights = get_flights()
   flight = next(filter(lambda f: f['flight_id'] == flight_id, flights), None)
   data = get_templated_message_input(app.config['RECIPIENT_WAID'], flight)
-  
+
   try:
       await send_message(data)
       print(f"Access token: {config['ACCESS_TOKEN']}")
