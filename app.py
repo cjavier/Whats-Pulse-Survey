@@ -135,6 +135,7 @@ def handle_whatsapp_messages(message_data):
 @app.route('/webhook', methods=['POST'])
 def webhook_verification():
     message_data = request.get_json()
+    print(f'Message data: {message_data}')  # Agrega esta línea para imprimir los datos del mensaje
     handle_whatsapp_messages(message_data)
     return "ok"
 
