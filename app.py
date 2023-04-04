@@ -146,10 +146,18 @@ def handle_whatsapp_messages(message_data):
                                     name = None
                                     if 'contacts' in value and len(value['contacts']) > 0:
                                         name = value['contacts'][0]['profile']['name']
-
-                                    # Call store_employee_message to store the sender's information
-                                    if name:
+                                    # Check if the text contains a company ID preceded by '@'
+                                    company_id = None
+                                    at_index = text.find('@')
+                                    if at_index != -1:
+                                        company_id_candidate = text[at_index + 1:]
+                                        if company_id_candidate.isalnum():  # Check if the string after '@' is alphanumeric
+                                            company_id = company_id_candidate
+                                    if text[0].isdigit():
                                         company_id = 'eWLE0uvjozhAAq5giKIA'  # Replace this with the actual company ID
+                                        store_survey_answer(company_id, sender, text)
+                                    # Call store_employee_message to store the sender's information
+                                    elif name and company_id:
                                         store_employee_message(company_id, name, sender)
                                 else:
                                     print('No se pudo procesar el mensaje:', message)
@@ -187,3 +195,11 @@ def store_employee_message(company_id, name, wa_id):
 
     # Add the new employee document to the employees collection
     employees_ref.add(new_employee)
+
+def store_survey_answer(company_id, wa_id, answer):
+    db = firestore.Client()
+    doc_ref = db.collection('companies').document(company_id).collection('survey_answers').document()
+    doc_ref.set({
+        'wa_id': wa_id,
+        'answer': answer
+    })
