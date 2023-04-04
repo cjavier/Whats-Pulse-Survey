@@ -10,6 +10,9 @@ from config import config
 import traceback
 import firebase_admin
 from firebase_admin import auth, credentials
+import google.auth
+from google.cloud import firestore
+from google.oauth2 import service_account
 
 
 
@@ -28,6 +31,13 @@ cred_dict = {
  
 cred = credentials.Certificate(cred_dict)  # Reemplaza con la ruta al archivo de clave privada de Firebase.
 firebase_admin.initialize_app(cred)
+
+# Autentica y crea el cliente de Firestore
+# Crea las credenciales a partir del diccionario
+credentials = service_account.Credentials.from_service_account_info(cred_dict)
+# Inicializa el cliente de Firestore
+db = firestore.Client(credentials=credentials, project=credentials.project_id)
+
 
 app = Flask(__name__)
 app.secret_key = 'asdf93kasf83q98ccqh9'  # Reemplaza con una clave secreta para proteger las sesiones.
@@ -131,9 +141,18 @@ def handle_whatsapp_messages(message_data):
                                     sender = message['from']
                                     text = message['text']['body']
                                     print(f'Mensaje recibido de {sender}: {text}')
+                                    
+                                    # Extract the name of the sender
+                                    name = None
+                                    if 'contacts' in value and len(value['contacts']) > 0:
+                                        name = value['contacts'][0]['profile']['name']
+
+                                    # Call store_employee_message to store the sender's information
+                                    if name:
+                                        company_id = 'eWLE0uvjozhAAq5giKIA'  # Replace this with the actual company ID
+                                        store_employee_message(company_id, name, sender)
                                 else:
                                     print('No se pudo procesar el mensaje:', message)
-
 
 #@app.route('/webhook', methods=['GET'])
 #def webhook_verification():
@@ -148,5 +167,23 @@ def webhook_verification():
     handle_whatsapp_messages(message_data)
     return "ok"
 
+def store_employee_message(company_id, name, wa_id):
+    # Reference to the company document and the employees collection
+    company_ref = db.collection('companies').document("eWLE0uvjozhAAq5giKIA")
+    employees_ref = company_ref.collection('employees')
+    
+    # Check if an employee with the given wa_id already exists
+    existing_employee = employees_ref.where('wa_id', '==', wa_id).stream()
 
-#os.environ.get('ACCESS_TOKEN')
+    # If the employee exists, we don't want to add them again, so just return
+    for employee in existing_employee:
+        return
+    
+    # If the employee does not exist, create a new employee document
+    new_employee = {
+        'name': name,
+        'wa_id': wa_id
+    }
+
+    # Add the new employee document to the employees collection
+    employees_ref.add(new_employee)
