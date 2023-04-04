@@ -10,8 +10,7 @@ from config import config
 import traceback
 import firebase_admin
 from firebase_admin import auth, credentials
-from google.oauth2 import id_token
-from google.auth.transport import requests
+
 
 
 cred_dict = {

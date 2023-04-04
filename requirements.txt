@@ -5,5 +5,3 @@ aiohttp
 asgiref
 aioflask
 firebase-admin
-google.oauth2
-google.auth.transport
