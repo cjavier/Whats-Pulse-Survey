@@ -37,13 +37,16 @@ def get_text_message_input(recipient, text):
   })
   
 def get_templated_message_input(recipient, flight):
-  return json.dumps({
+  return json.dumps(
+    {
     "messaging_product": "whatsapp",
-    "preview_url": False,
-    "recipient_type": "individual",
     "to": recipient,
-    "type": "text",
-    "text": {
-        "body": "esto es una prueba"
+    "type": "template",
+    "template": {
+        "name": "hello_world",
+        "language": {
+            "code": "en_US"
+        }
     }
-  })
+}
+  )

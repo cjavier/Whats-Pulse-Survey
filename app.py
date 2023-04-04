@@ -35,7 +35,7 @@ app.secret_key = 'asdf93kasf83q98ccqh9'  # Reemplaza con una clave secreta para 
 with open('config.json') as f:
     config = json.load(f)
 app.config.update(config)
-config['ACCESS_TOKEN'] = os.environ['ACCESS_TOKEN']
+app.config['ACCESS_TOKEN'] = os.environ['ACCESS_TOKEN']
 
 @app.route("/")
 def index():
