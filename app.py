@@ -62,13 +62,34 @@ def login():
         uid = decoded_token['uid']
         user = auth.get_user(uid)
         session['user_id'] = user.uid
+        
+        # Obtain the company_id by user email
+        company_id = get_company_id_by_email(user.email)
+        if company_id:
+            session['company_id'] = company_id
+            print ("company id is: ",company_id)
+        else:
+            print("No se encontró el company_id para el usuario.")
+        
         return flask.redirect(flask.url_for('catalog'))
     except Exception as e:
         print(e)
         return redirect(url_for('index'))
 
+
 if __name__ == '__main__':
     app.run(debug=True)
+
+def get_company_id_by_email(user_email):
+    companies_ref = db.collection("companies")
+    query = companies_ref.where("email", "==", user_email).limit(1)
+    result = query.stream()
+    
+    for doc in result:
+        return doc.id
+
+    return None
+
 
 #google firebase create new users
 @app.route('/register', methods=['GET', 'POST'])
@@ -92,7 +113,6 @@ def register():
 
 @app.route('/employees')
 def employees():
-    company_id = 'eWLE0uvjozhAAq5giKIA'  # Replace this with the actual company ID
     employees = get_company_employees(company_id)
     return render_template('employees.html', employees=employees)
 
@@ -106,6 +126,45 @@ def get_company_employees(company_id):
         employees_list.append(employee.to_dict())
 
     return employees_list
+
+@app.route('/survey-answers')
+def survey_answers():
+    # Reemplaza 'Companies' y 'survey answers' con los nombres de tus colecciones en Firestore
+    companies_ref = db.collection('companies')
+    company_id = session.get('company_id')
+    if company_id is None:
+        return "No se encontró el company_id en la sesión.", 400
+
+    survey_answers_ref = companies_ref.document(company_id).collection('survey answers')
+    survey_answers_data = survey_answers_ref.stream()
+
+    survey_answers = []
+    for doc in survey_answers_data:
+        answer_data = doc.to_dict()
+        answer_data['id'] = doc.id
+        survey_answers.append(answer_data)
+
+    return render_template('survey_answers.html', survey_answers=survey_answers)
+
+
+@app.route('/surveys-sent')
+def surveys_sent():
+    # Reemplaza 'Companies' y 'surveys sent' con los nombres de tus colecciones en Firestore
+    companies_ref = db.collection('companies')
+    company_id = session.get('company_id')
+    if company_id is None:
+        return "No se encontró el company_id en la sesión.", 400
+
+    surveys_sent_ref = companies_ref.document(company_id).collection('surveys sent')
+    surveys_sent_data = surveys_sent_ref.stream()
+
+    surveys_sent = []
+    for doc in surveys_sent_data:
+        survey_data = doc.to_dict()
+        survey_data['id'] = doc.id
+        surveys_sent.append(survey_data)
+
+    return render_template('surveys_sent.html', surveys_sent=surveys_sent)
 
 
 @app.route("/catalog")
@@ -129,12 +188,12 @@ async def buy_ticket():
     recipient_phone_number = app.config['RECIPIENT_WAID']
     data = send_quick_reply_message(recipient_phone_number)
     template_name = "quick_reply_template"  # Replace with the actual template name
-    company_id = "eWLE0uvjozhAAq5giKIA"  # Replace with the actual company ID
 
     try:
         await send_message(data)
         print(f"Access token: {config['ACCESS_TOKEN']}")
         print(f"Recipient waid: {config['RECIPIENT_WAID']}")
+        print(company_id)
 
         await store_sent_survey(company_id, template_name, recipient_phone_number)
     except Exception as e:
@@ -166,23 +225,9 @@ def handle_whatsapp_messages(message_data):
                                     if 'contacts' in value and len(value['contacts']) > 0:
                                         name = value['contacts'][0]['profile']['name']
                                     # Find the company ID by looking for an existing employee with the wa_id
-                                    company_id = find_company_id_by_wa_id(sender)
                                     print("name extracted")
-                                    if company_id is None:
-                                        print("company id not found")
-                                        # Code to handle when the wa_id is not found in any company
-                                        # Check if the text contains a company ID preceded by '@'
-                                        company_id = None
-                                        at_index = text.find('@')
-                                        if at_index != -1:
-                                            company_id_candidate = text[at_index + 1:]
-                                            if company_id_candidate.isalnum():  # Check if the string after '@' is alphanumeric
-                                                company_id = company_id_candidate
-                                        # Call store_employee_message to store the sender's information
-                                        if name and company_id:
-                                            store_employee_message(company_id, name, sender)
-
-                                    # Code to handle when the wa_id is found or not found, and the company_id is available
+                                    if name and company_id:
+                                        store_employee_message(company_id, name, sender)
                                     if company_id:
                                         store_survey_answer(company_id, sender, text)
                                     

@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+    <h1>Surveys Sent</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Recipient WAID</th>
+                <th>Template Name</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for survey in surveys_sent %}
+                <tr>
+                    <td>{{ survey.recipient_wa_id }}</td>
+                    <td>{{ survey.template_name }}</td>
+                    <td>{{ survey.timestamp }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+   
+{% endblock %}

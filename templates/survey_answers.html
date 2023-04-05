@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1>Survey Answers</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Sender</th>
+                <th>Answer</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for answer in survey_answers %}
+                <tr>
+                    <td>{{ answer.wa_id }}</td>
+                    <td>{{ answer.answer }}</td>
+                    <td>{{ answer.timestamp }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>    
+{% endblock %}
