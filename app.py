@@ -10,33 +10,28 @@ from config import config
 import traceback
 import firebase_admin
 from firebase_admin import auth, credentials
+from google.auth import load_credentials_from_file
 import google.auth
 from google.cloud import firestore
 from google.oauth2 import service_account
+from datetime import datetime
 
 
+cred_file_path = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
 
-cred_dict = {
-  "type": "service_account",
-  "project_id": os.environ["PROJECT_ID"],
-  "private_key_id": os.environ["PRIVATE_KEY_ID"],
-    "private_key": os.environ["PRIVATE_KEY"].replace('\\n', '\n'),
-    "client_email": os.environ["CLIENT_EMAIL"],
-  "client_id": "115853760336082885268",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-ukg3l%40whats-pulse-survey.iam.gserviceaccount.com"
-}
- 
-cred = credentials.Certificate(cred_dict)  # Reemplaza con la ruta al archivo de clave privada de Firebase.
+# Utiliza el archivo JSON para crear el objeto Certificate
+cred = credentials.Certificate(cred_file_path)
+
+# Inicializa Firebase
 firebase_admin.initialize_app(cred)
 
 # Autentica y crea el cliente de Firestore
-# Crea las credenciales a partir del diccionario
-credentials = service_account.Credentials.from_service_account_info(cred_dict)
-# Inicializa el cliente de Firestore
-db = firestore.Client(credentials=credentials, project=credentials.project_id)
+# Carga las credenciales de google-auth
+creds, _ = google.auth.load_credentials_from_file(cred_file_path)
+
+# Inicializa el cliente de Firestore con las credenciales de google-auth
+db = firestore.Client(credentials=creds)
+
 
 
 app = Flask(__name__)
@@ -117,24 +112,37 @@ def get_company_employees(company_id):
 def catalog():
     return render_template('catalog.html', title='Flight Confirmation Demo for Python', flights=get_flights())
 
+async def store_sent_survey(company_id, template_name, recipient_wa_id):
+    try:
+        doc_ref = db.collection('companies').document(company_id).collection('surveys sent').document()
+        doc_ref.set({
+            'template_name': template_name,
+            'recipient_wa_id': recipient_wa_id,
+            'timestamp': datetime.utcnow()
+        })
+        print(f"Stored sent survey for {recipient_wa_id} in company {company_id}")
+    except Exception as e:
+        print(f"Error storing sent survey: {e}")
+
 @app.route("/buy-ticket", methods=['POST'])
 async def buy_ticket():
-  recipient_phone_number = app.config['RECIPIENT_WAID']
-  text = "Por favor, selecciona una opción:"
-  options = ["Opción 1", "Opción 2", "Opción 3"]
-  data = send_quick_reply_message(recipient_phone_number, text, options)
+    recipient_phone_number = app.config['RECIPIENT_WAID']
+    data = send_quick_reply_message(recipient_phone_number)
+    template_name = "quick_reply_template"  # Replace with the actual template name
+    company_id = "eWLE0uvjozhAAq5giKIA"  # Replace with the actual company ID
 
-  try:
-      await send_message(data)
-      print(f"Access token: {config['ACCESS_TOKEN']}")
-      print(f"Recipient waid: {config['RECIPIENT_WAID']}")
-  except Exception as e:
-      traceback.print_exc()
-      print(f"Error sending message: {e}")
-      print(f"Access token: {config['ACCESS_TOKEN']}")
+    try:
+        await send_message(data)
+        print(f"Access token: {config['ACCESS_TOKEN']}")
+        print(f"Recipient waid: {config['RECIPIENT_WAID']}")
 
-  
-  return flask.redirect(flask.url_for('catalog'))
+        await store_sent_survey(company_id, template_name, recipient_phone_number)
+    except Exception as e:
+        traceback.print_exc()
+        print(f"Error sending message: {e}")
+        print(f"Access token: {config['ACCESS_TOKEN']}")
+
+    return flask.redirect(flask.url_for('catalog'))
 
 def handle_whatsapp_messages(message_data):
     if 'entry' in message_data:
@@ -159,7 +167,9 @@ def handle_whatsapp_messages(message_data):
                                         name = value['contacts'][0]['profile']['name']
                                     # Find the company ID by looking for an existing employee with the wa_id
                                     company_id = find_company_id_by_wa_id(sender)
+                                    print("name extracted")
                                     if company_id is None:
+                                        print("company id not found")
                                         # Code to handle when the wa_id is not found in any company
                                         # Check if the text contains a company ID preceded by '@'
                                         company_id = None
@@ -171,13 +181,14 @@ def handle_whatsapp_messages(message_data):
                                         # Call store_employee_message to store the sender's information
                                         if name and company_id:
                                             store_employee_message(company_id, name, sender)
-                                    else:
-                                        # Code to handle when the wa_id is found and the company_id is available
+
+                                    # Code to handle when the wa_id is found or not found, and the company_id is available
+                                    if company_id:
                                         store_survey_answer(company_id, sender, text)
-                                        pass
                                     
                                 else:
                                     print('No se pudo procesar el mensaje:', message)
+
 
 
 def find_company_id_by_wa_id(wa_id):

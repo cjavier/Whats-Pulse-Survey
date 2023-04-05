@@ -51,7 +51,7 @@ def get_templated_message_input(recipient, flight):
 }
   )
 
-def send_quick_reply_message(to_phone_number, text, options):
+def send_quick_reply_message(to_phone_number):
     return json.dumps(
     {
    "messaging_product": "whatsapp",
