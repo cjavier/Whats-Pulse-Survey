@@ -280,25 +280,34 @@ def handle_whatsapp_messages(message_data):
                                         name = None
                                         company_id = None
                                         if '@' in text:
+                                            print("Encontró arroba en el texto")
                                             match = re.search(r'@([a-zA-Z]+)\b', text)
                                             if match:
                                                 company_id = match.group(1)
-                                                print ("company id seteado")
-                                            else
-                                                print ("no match")
+                                                print("company id seteado:", company_id)
+                                            else:
+                                                print("No se encontró el company id")
                                             if 'contacts' in value and len(value['contacts']) > 0:
                                                 name = value['contacts'][0]['profile']['name']
-                                                print ("nombre seteado")
-                                            print ("arroba en texto")
-                                        # Find the company ID by looking for an existing employee with the wa_id
+                                                print("nombre seteado:", name)
+                                            else:
+                                                print("No se pudo establecer el nombre")
+                                            print("arroba en texto")
+                                        else:
+                                            print("No se encontró arroba en el texto")
+
                                         if name and company_id:
                                             store_employee(company_id, name, sender)
-                                            print ("Guardando empleado")
+                                            print("Guardando empleado")
+                                        else:
+                                            print("No se pudo guardar el empleado")
+
                                         if company_id and text[0].isdigit():
                                             store_survey_answer(company_id, sender, text)
-                                            print ("Guardando survey answer")
-                                    else:
-                                        print('No se pudo procesar el mensaje:', message)
+                                            print("Guardando survey answer")
+                                        else:
+                                            print("No se pudo guardar la respuesta de la encuesta")
+
 
 
 
