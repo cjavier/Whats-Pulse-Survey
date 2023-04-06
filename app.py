@@ -283,8 +283,12 @@ def handle_whatsapp_messages(message_data):
                                             match = re.search(r'@([a-zA-Z]+)\b', text)
                                             if match:
                                                 company_id = match.group(1)
+                                                print ("company id seteado")
+                                            else
+                                                print ("no match")
                                             if 'contacts' in value and len(value['contacts']) > 0:
                                                 name = value['contacts'][0]['profile']['name']
+                                                print ("nombre seteado")
                                             print ("arroba en texto")
                                         # Find the company ID by looking for an existing employee with the wa_id
                                         if name and company_id:
