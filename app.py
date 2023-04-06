@@ -2,7 +2,7 @@ import json
 import os
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import flask
-from message_helper import get_templated_message_input, get_text_message_input, send_message, send_quick_reply_message
+from message_helper import get_templated_message_input, get_text_message_input, send_message, send_quick_reply_message, send_pulse_survey
 from flights import get_flights
 import hmac
 import hashlib
@@ -15,6 +15,9 @@ import google.auth
 from google.cloud import firestore
 from google.oauth2 import service_account
 from datetime import datetime
+import time
+import re
+
 
 
 cred_file_path = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
@@ -113,6 +116,7 @@ def register():
 
 @app.route('/employees')
 def employees():
+    company_id = session.get('company_id')
     employees = get_company_employees(company_id)
     return render_template('employees.html', employees=employees)
 
@@ -166,6 +170,25 @@ def surveys_sent():
 
     return render_template('surveys_sent.html', surveys_sent=surveys_sent)
 
+@app.route('/surveys')
+def surveys():
+    companies_ref = db.collection('companies')
+    company_id = session.get('company_id')
+    if company_id is None:
+        return "No se encontró el company_id en la sesión.", 400
+
+    pulse_surveys_ref = companies_ref.document(company_id).collection('pulse surveys')
+    pulse_surveys_data = pulse_surveys_ref.stream()
+
+    pulse_surveys = []
+    for doc in pulse_surveys_data:
+        survey_data = doc.to_dict()
+        survey_data['id'] = doc.id
+        pulse_surveys.append(survey_data)
+
+    return render_template('surveys.html', pulse_surveys=pulse_surveys)
+
+
 
 @app.route("/catalog")
 def catalog():
@@ -203,6 +226,33 @@ async def buy_ticket():
 
     return flask.redirect(flask.url_for('catalog'))
 
+
+@app.route("/send-to-employee/<int:employee_wa_id>", methods=['POST'])
+async def send_to_employee(employee_wa_id):
+    recipient_phone_number = employee_wa_id
+    data = send_pulse_survey(recipient_phone_number)
+    template_name = "pulse_survey_1"  # Replace with the actual template name
+    company_id = session.get('company_id')
+
+    try:
+        for i in range(3):
+            await send_message(data)
+            print(f"Access token: {config['ACCESS_TOKEN']}")
+            print(f"Recipient waid: {recipient_phone_number}")
+
+            await store_sent_survey(company_id, template_name, recipient_phone_number)
+
+            # Wait for one minute before sending the next message
+            time.sleep(30)
+    except Exception as e:
+        traceback.print_exc()
+        print(f"Error sending message: {e}")
+        print(f"Access token: {config['ACCESS_TOKEN']}")
+
+    return flask.redirect(flask.url_for('catalog'))
+
+
+
 def handle_whatsapp_messages(message_data):
     if 'entry' in message_data:
         entries = message_data['entry']
@@ -222,13 +272,17 @@ def handle_whatsapp_messages(message_data):
                                     
                                     # Extract the name of the sender
                                     name = None
-                                    if 'contacts' in value and len(value['contacts']) > 0:
-                                        name = value['contacts'][0]['profile']['name']
+                                    company_id = None
+                                    if '@' in text:
+                                        match = re.search(r'@([a-zA-Z]+)\b', text)
+                                        if match:
+                                            company_id = match.group(1)
+                                        if 'contacts' in value and len(value['contacts']) > 0:
+                                            name = value['contacts'][0]['profile']['name']
                                     # Find the company ID by looking for an existing employee with the wa_id
-                                    print("name extracted")
                                     if name and company_id:
-                                        store_employee_message(company_id, name, sender)
-                                    if company_id:
+                                        store_employee(company_id, name, sender)
+                                    if company_id and text[0].isdigit():
                                         store_survey_answer(company_id, sender, text)
                                     
                                 else:
@@ -265,9 +319,9 @@ def webhook_verification():
     handle_whatsapp_messages(message_data)
     return "ok"
 
-def store_employee_message(company_id, name, wa_id):
+def store_employee(company_id, name, wa_id):
     # Reference to the company document and the employees collection
-    company_ref = db.collection('companies').document("eWLE0uvjozhAAq5giKIA")
+    company_ref = db.collection('companies').document(company_id)
     employees_ref = company_ref.collection('employees')
     
     # Check if an employee with the given wa_id already exists
@@ -287,9 +341,23 @@ def store_employee_message(company_id, name, wa_id):
     employees_ref.add(new_employee)
 
 def store_survey_answer(company_id, wa_id, answer):
-    db = firestore.Client()
-    doc_ref = db.collection('companies').document(company_id).collection('survey_answers')
+    doc_ref = db.collection('companies').document(company_id).collection('survey answers')
     doc_ref.add({
         'wa_id': wa_id,
         'answer': answer
     })
+
+@app.route('/update-pulse-survey', methods=['POST'])
+def update_pulse_survey():
+    company_id = request.form['company_id']
+    survey_id = request.form['survey_id']
+    activo = request.form.get('activo') == 'on'
+
+    company_ref = db.collection('companies').document(company_id)
+    survey_ref = company_ref.collection('pulse surveys').document(survey_id)
+
+    survey_ref.update({
+        'activo': activo
+    })
+
+    return redirect(url_for('surveys'))

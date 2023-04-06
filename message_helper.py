@@ -99,3 +99,52 @@ def send_quick_reply_message(to_phone_number):
    }
 }
   )
+
+def send_pulse_survey(to_phone_number):
+    return json.dumps(
+    {
+   "messaging_product": "whatsapp",
+   "to": to_phone_number,
+   "type": "template",
+   "template": {
+       "name": "pulse_survey_1",
+       "language": {
+           "code": "es_MX",
+           "policy": "deterministic"
+       },
+       "components": [
+           {
+               "type": "body",
+               "parameters": [
+                   {
+                       "type": "text",
+                       "text": "impactum"
+                   }
+               ]
+           },
+           {
+               "type": "button",
+               "sub_type": "quick_reply",
+               "index": 0,
+               "parameters": [
+                   {
+                       "type": "text",
+                       "text": "Yes"
+                   }
+               ]
+           },
+           {
+               "type": "button",
+               "sub_type": "quick_reply",
+               "index": 1,
+               "parameters": [
+                   {
+                       "type": "text",
+                       "text": "No"
+                   }
+               ]
+           }
+       ]
+   }
+}
+  )

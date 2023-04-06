@@ -7,6 +7,7 @@
             <tr>
                 <th>Name</th>
                 <th>WhatsApp ID</th>
+                <th>Send Message</th>
             </tr>
         </thead>
         <tbody>
@@ -14,6 +15,11 @@
                 <tr>
                     <td>{{ employee.name }}</td>
                     <td>{{ employee.wa_id }}</td>
+                    <td>
+                      <form method="POST" action=/send-to-employee/{{ employee.wa_id }} >
+                        <input type="submit" value="Send Message"/>
+                      </form>
+                    </td>
                 </tr>
             {% endfor %}
         </tbody>
