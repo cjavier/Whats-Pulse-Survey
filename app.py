@@ -265,31 +265,37 @@ def handle_whatsapp_messages(message_data):
                         if 'messages' in value:
                             messages = value['messages']
                             for message in messages:
-                                if 'from' in message and 'text' in message:
+                                if 'from' in message:
                                     sender = message['from']
-                                    text = message['text']['body']
-                                    print(f'Mensaje recibido de {sender}: {text}')
-                                    
-                                    # Extract the name of the sender
-                                    name = None
-                                    company_id = None
-                                    if '@' in text:
-                                        match = re.search(r'@([a-zA-Z]+)\b', text)
-                                        if match:
-                                            company_id = match.group(1)
-                                        if 'contacts' in value and len(value['contacts']) > 0:
-                                            name = value['contacts'][0]['profile']['name']
-                                        print ("arroba en texto")
-                                    # Find the company ID by looking for an existing employee with the wa_id
-                                    if name and company_id:
-                                        store_employee(company_id, name, sender)
-                                        print ("Guardando empleado")
-                                    if company_id and text[0].isdigit():
-                                        store_survey_answer(company_id, sender, text)
-                                        print ("Guardando survey answer")
-                                    
-                                else:
-                                    print('No se pudo procesar el mensaje:', message)
+                                    text = None
+                                    if 'text' in message:
+                                        text = message['text']['body']
+                                    elif 'button' in message:
+                                        text = message['button']['text']
+
+                                    if text is not None:
+                                        print(f'Mensaje recibido de {sender}: {text}')
+                                        
+                                        # Extract the name of the sender
+                                        name = None
+                                        company_id = None
+                                        if '@' in text:
+                                            match = re.search(r'@([a-zA-Z]+)\b', text)
+                                            if match:
+                                                company_id = match.group(1)
+                                            if 'contacts' in value and len(value['contacts']) > 0:
+                                                name = value['contacts'][0]['profile']['name']
+                                            print ("arroba en texto")
+                                        # Find the company ID by looking for an existing employee with the wa_id
+                                        if name and company_id:
+                                            store_employee(company_id, name, sender)
+                                            print ("Guardando empleado")
+                                        if company_id and text[0].isdigit():
+                                            store_survey_answer(company_id, sender, text)
+                                            print ("Guardando survey answer")
+                                    else:
+                                        print('No se pudo procesar el mensaje:', message)
+
 
 
 
