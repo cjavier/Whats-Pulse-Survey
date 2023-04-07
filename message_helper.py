@@ -16,8 +16,10 @@ async def send_message(data):
           print("Status:", response.status)
           print("Content-type:", response.headers['content-type'])
 
-          html = await response.text()
-          print("Body:", html)
+          json_response = await response.json()
+          message_id = json_response['messages'][0]['id']
+          print("Message ID:", message_id)
+          return message_id
         else:
           print(response.status)        
           print(response)        
@@ -100,14 +102,14 @@ def send_quick_reply_message(to_phone_number):
 }
   )
 
-def send_pulse_survey(to_phone_number):
+def send_pulse_survey(to_phone_number, template_name):
     return json.dumps(
     {
    "messaging_product": "whatsapp",
    "to": to_phone_number,
    "type": "template",
    "template": {
-       "name": "pulse_survey_1",
+       "name": template_name,
        "language": {
            "code": "es_MX",
            "policy": "deterministic"

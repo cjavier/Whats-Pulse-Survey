@@ -194,13 +194,14 @@ def surveys():
 def catalog():
     return render_template('catalog.html', title='Flight Confirmation Demo for Python', flights=get_flights())
 
-async def store_sent_survey(company_id, template_name, recipient_wa_id):
+async def store_sent_survey(company_id, template_name, recipient_wa_id, message_id):
     try:
         doc_ref = db.collection('companies').document(company_id).collection('surveys sent').document()
         doc_ref.set({
             'template_name': template_name,
             'recipient_wa_id': recipient_wa_id,
-            'timestamp': datetime.utcnow()
+            'timestamp': datetime.utcnow(),
+            'message_id': message_id
         })
         print(f"Stored sent survey for {recipient_wa_id} in company {company_id}")
     except Exception as e:
@@ -230,26 +231,35 @@ async def buy_ticket():
 @app.route("/send-to-employee/<int:employee_wa_id>", methods=['POST'])
 async def send_to_employee(employee_wa_id):
     recipient_phone_number = employee_wa_id
-    data = send_pulse_survey(recipient_phone_number)
-    template_name = "pulse_survey_1"  # Replace with the actual template name
     company_id = session.get('company_id')
 
     try:
-        for i in range(3):
-            await send_message(data)
+        # Get the reference to the pulse surveys collection
+        pulse_surveys_ref = db.collection('companies').document(company_id).collection('pulse surveys')
+        pulse_surveys_data = pulse_surveys_ref.stream()
+
+        # Iterate over the documents in the collection to send a message for each survey
+        for doc in pulse_surveys_data:
+            pulse_survey_id = doc.id
+            template_name = doc.get('template')
+            print(f"Pulse survey ID: {pulse_survey_id}, template name: {template_name}")
+            
+            data = send_pulse_survey(recipient_phone_number, template_name)
+            message_id = await send_message(data)
+            await store_sent_survey(company_id, template_name, recipient_phone_number, message_id)
             print(f"Access token: {config['ACCESS_TOKEN']}")
             print(f"Recipient waid: {recipient_phone_number}")
-
-            await store_sent_survey(company_id, template_name, recipient_phone_number)
+            print(f"message_is: {message_id}")
 
             # Wait for one minute before sending the next message
             time.sleep(30)
+
     except Exception as e:
         traceback.print_exc()
         print(f"Error sending message: {e}")
         print(f"Access token: {config['ACCESS_TOKEN']}")
 
-    return flask.redirect(flask.url_for('catalog'))
+
 
 
 
@@ -268,11 +278,14 @@ def handle_whatsapp_messages(message_data):
                                 if 'from' in message:
                                     sender = message['from']
                                     text = None
+                                    message_id = None
                                     if 'text' in message:
                                         text = message['text']['body']
+                                        message_id = message['context']['id']
                                     elif 'button' in message:
                                         text = message['button']['text']
-
+                                        message_id = message['id']
+                                    
                                     if text is not None:
                                         print(f'Mensaje recibido de {sender}: {text}')
                                         
@@ -302,8 +315,8 @@ def handle_whatsapp_messages(message_data):
                                         else:
                                             print("No se pudo guardar el empleado")
 
-                                        if text[0].isdigit():
-                                            store_survey_answer(sender, text)
+                                        if text[0].isdigit() and message_id:
+                                            store_survey_answer(sender, text, message_id)
                                             print("Guardando survey answer")
                                         else:
                                             print("No se pudo guardar la respuesta de la encuesta")
