@@ -252,7 +252,7 @@ async def send_to_employee(employee_wa_id):
             print(f"message_is: {message_id}")
 
             # Wait for one minute before sending the next message
-            time.sleep(30)
+            time.sleep(5)
 
     except Exception as e:
         traceback.print_exc()
@@ -262,7 +262,19 @@ async def send_to_employee(employee_wa_id):
 
 
 
+#@app.route('/webhook', methods=['GET'])
+#def webhook_verification():
+#    if request.args.get('hub.verify_token') == '12345':
+#        return request.args.get('hub.challenge')
+#    return "Error verifying token"
 
+@app.route('/webhook', methods=['POST'])
+def webhook_verification():
+    message_data = request.get_json()
+    print(f'Message data: {message_data}')  # Agrega esta línea para imprimir los datos del mensaje
+    handle_whatsapp_messages(message_data)
+    return "ok"
+    
 def handle_whatsapp_messages(message_data):
     if 'entry' in message_data:
         entries = message_data['entry']
@@ -340,18 +352,6 @@ def find_company_id_by_wa_id(wa_id):
     return None
 
 
-#@app.route('/webhook', methods=['GET'])
-#def webhook_verification():
-#    if request.args.get('hub.verify_token') == '12345':
-#        return request.args.get('hub.challenge')
-#    return "Error verifying token"
-
-@app.route('/webhook', methods=['POST'])
-def webhook_verification():
-    message_data = request.get_json()
-    print(f'Message data: {message_data}')  # Agrega esta línea para imprimir los datos del mensaje
-    handle_whatsapp_messages(message_data)
-    return "ok"
 
 def store_employee(company_id, name, wa_id):
     # Reference to the company document and the employees collection
@@ -379,7 +379,7 @@ def store_employee(company_id, name, wa_id):
     employees_ref.add(new_employee)
 
 
-def store_survey_answer(wa_id, answer, message_id):
+def store_survey_answer(wa_id, answer):
     companies_ref = db.collection('companies').stream()
     company_id = None
     for company in companies_ref:
@@ -390,11 +390,15 @@ def store_survey_answer(wa_id, answer, message_id):
         doc_ref = db.collection('companies').document(company_id).collection('survey answers')
         doc_ref.add({
             'wa_id': wa_id,
-            'answer': answer,
-            'message_id': message_id
+            'answer': answer
         })
+        
+        # Call pulse_survey_results function to store survey results
+        pulse_survey_results(company_id, answer)
+
     else:
-        print(f"No se encontró el empleado con el wa_id {wa_id} en ninguna empresa")
+        print(f"No se encontró el empleado con el wa_id {wa_id} en ninguna empresa") 
+
 
 
 @app.route('/update-pulse-survey', methods=['POST'])
@@ -411,3 +415,31 @@ def update_pulse_survey():
     })
 
     return redirect(url_for('surveys'))
+
+
+def pulse_survey_results(company_id, answer):
+    # Get the reference to the survey sent collection
+    survey_sent_ref = db.collection('companies').document(company_id).collection('surveys sent')
+    survey_sent_data = survey_sent_ref.stream()
+
+    # Look for the message_id of the survey answer in the survey sent collection
+    message_id = None
+    template_name = None
+    for doc in survey_sent_data:
+        survey_sent_answer = doc.get('survey_answer')
+        if survey_sent_answer and survey_sent_answer == answer:
+            message_id = doc.get('message_id')
+            template_name = doc.get('template_name')
+            break
+
+    if message_id and template_name:
+        # Save the survey results in the pulse survey results collection
+        pulse_survey_results_ref = db.collection('companies').document(company_id).collection('pulse survey results')
+        pulse_survey_results_ref.add({
+            'template_name': template_name,
+            'answer': answer,
+            'timestamp': datetime.datetime.now(),
+            'message_id': message_id
+        })
+    else:
+        print(f"No se encontró el mensaje para la respuesta de la encuesta {answer}")
