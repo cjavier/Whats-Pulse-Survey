@@ -302,8 +302,8 @@ def handle_whatsapp_messages(message_data):
                                         else:
                                             print("No se pudo guardar el empleado")
 
-                                        if company_id and text[0].isdigit():
-                                            store_survey_answer(company_id, sender, text)
+                                        if text[0].isdigit():
+                                            store_survey_answer(sender, text)
                                             print("Guardando survey answer")
                                         else:
                                             print("No se pudo guardar la respuesta de la encuesta")
@@ -346,6 +346,10 @@ def store_employee(company_id, name, wa_id):
     company_ref = db.collection('companies').document(company_id)
     employees_ref = company_ref.collection('employees')
     
+    # Check if the company document exists
+    if not company_ref.get().exists:
+        return
+
     # Check if an employee with the given wa_id already exists
     existing_employee = employees_ref.where('wa_id', '==', wa_id).stream()
 
@@ -362,12 +366,22 @@ def store_employee(company_id, name, wa_id):
     # Add the new employee document to the employees collection
     employees_ref.add(new_employee)
 
-def store_survey_answer(company_id, wa_id, answer):
-    doc_ref = db.collection('companies').document(company_id).collection('survey answers')
-    doc_ref.add({
-        'wa_id': wa_id,
-        'answer': answer
-    })
+
+def store_survey_answer(wa_id, answer):
+    companies_ref = db.collection('companies').stream()
+    company_id = None
+    for company in companies_ref:
+        employees_ref = db.collection('companies').document(company.id).collection('employees').where('wa_id', '==', wa_id).stream()
+        for employee in employees_ref:
+            company_id = company.id
+    if company_id is not None:
+        doc_ref = db.collection('companies').document(company_id).collection('survey answers')
+        doc_ref.add({
+            'wa_id': wa_id,
+            'answer': answer
+        })
+    else:
+        print(f"No se encontró el empleado con el wa_id {wa_id} en ninguna empresa")
 
 @app.route('/update-pulse-survey', methods=['POST'])
 def update_pulse_survey():
