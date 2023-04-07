@@ -281,7 +281,7 @@ def handle_whatsapp_messages(message_data):
                                         company_id = None
                                         if '@' in text:
                                             print("Encontró arroba en el texto")
-                                            match = re.search(r'@([a-zA-Z]+)\b', text)
+                                            match = re.search(r'@(\S+)\b', text)
                                             if match:
                                                 company_id = match.group(1)
                                                 print("company id seteado:", company_id)
