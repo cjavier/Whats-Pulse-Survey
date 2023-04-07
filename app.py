@@ -324,7 +324,6 @@ def handle_whatsapp_messages(message_data):
 
 
 
-
 def find_company_id_by_wa_id(wa_id):
     db = firestore.Client()
     companies_ref = db.collection('companies')
@@ -380,7 +379,7 @@ def store_employee(company_id, name, wa_id):
     employees_ref.add(new_employee)
 
 
-def store_survey_answer(wa_id, answer):
+def store_survey_answer(wa_id, answer, message_id):
     companies_ref = db.collection('companies').stream()
     company_id = None
     for company in companies_ref:
@@ -391,10 +390,12 @@ def store_survey_answer(wa_id, answer):
         doc_ref = db.collection('companies').document(company_id).collection('survey answers')
         doc_ref.add({
             'wa_id': wa_id,
-            'answer': answer
+            'answer': answer,
+            'message_id': message_id
         })
     else:
         print(f"No se encontró el empleado con el wa_id {wa_id} en ninguna empresa")
+
 
 @app.route('/update-pulse-survey', methods=['POST'])
 def update_pulse_survey():
