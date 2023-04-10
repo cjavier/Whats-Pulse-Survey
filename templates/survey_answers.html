@@ -2,22 +2,5 @@
 
 {% block content %}
 <h1>Survey Answers</h1>
-    <table>
-        <thead>
-            <tr>
-                <th>Sender</th>
-                <th>Answer</th>
-                <th>Timestamp</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for answer in survey_answers %}
-                <tr>
-                    <td>{{ answer.wa_id }}</td>
-                    <td>{{ answer.answer }}</td>
-                    <td>{{ answer.timestamp }}</td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>    
+        <h2>Total de respuestas recibidas: {{ survey_answers|length }}</h2>    
 {% endblock %}

@@ -1,6 +1,6 @@
 import json
 import os
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
 import flask
 from message_helper import get_templated_message_input, get_text_message_input, send_message, send_quick_reply_message, send_pulse_survey
 from flights import get_flights
@@ -45,10 +45,12 @@ with open('config.json') as f:
 app.config.update(config)
 app.config['ACCESS_TOKEN'] = os.environ['ACCESS_TOKEN']
 
+
 @app.route("/")
 def index():
+    if "user_id" in session:
+        return redirect(url_for("employees"))
     return render_template('index.html', name=__name__)
-
 #
 #
 # BACK
@@ -213,12 +215,14 @@ def pulse_survey_results(company_id, answer, sent_message_id):
     for survey_sent_doc in surveys_sent_ref:
         survey_sent = survey_sent_doc.to_dict()
         timestamp = datetime.now()
+        score = int(answer[0])
         survey_results_ref = company_ref.collection('survey results')
         survey_results_ref.add({
             'template name': survey_sent['template_name'],
             'answer': answer,
             'message_id': sent_message_id,
-            'timestamp': timestamp
+            'timestamp': timestamp,
+            'score': score
         })
 
 def get_company_id_by_email(user_email):
@@ -238,6 +242,11 @@ def get_company_id_by_email(user_email):
 # FUNCTIONS
 #
 #
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
 
 @app.route("/welcome")
 def welcome():
@@ -281,17 +290,49 @@ def register():
         email = request.form['email']
         password = request.form['password']
         display_name = request.form['display_name']
+        handle = request.form['handle']
+        business_name = request.form['business_name']
         try:
             user = auth.create_user(
                 email=email,
                 password=password,
                 display_name=display_name
             )
-            return f"Usuario registrado con éxito: {user.uid}"
+            create_business(handle, email, business_name)
+            return redirect(url_for('employees'))
         except Exception as e:
             print(e)
             return "Error al registrar el usuario.", 400
     return render_template('register.html')
+
+
+@app.route('/create-business', methods=['POST'])
+def create_business(email, handle, business_name):
+    handle = request.form['handle']
+    email = request.form['email']
+    business_name = request.form['business_name']
+    
+    # Check if handle already exists
+    company_ref = db.collection('companies').document(handle)
+    if company_ref.get().exists:
+        flash('Handle already exists. Please choose a different one.', 'error')
+        return redirect(url_for('index'))
+
+    # Create document in companies collection
+    company_data = {'email': email, 'business_name': business_name}
+    company_ref.set(company_data)
+
+    # Copy documents from 'pulse surveys' to new collection
+    pulse_surveys_ref = db.collection('pulse surveys')
+    new_collection_ref = company_ref.collection('pulse surveys')
+    for survey_doc in pulse_surveys_ref.stream():
+        survey_data = survey_doc.to_dict()
+        new_collection_ref.document(survey_doc.id).set(survey_data)
+
+    flash('Business created successfully!', 'success')
+    return redirect(url_for('index'))
+
+
  
 
 @app.route('/employees')
@@ -368,23 +409,53 @@ def surveys():
 
     return render_template('surveys.html', pulse_surveys=pulse_surveys)
 
+@app.route('/survey-results')
+def survey_results():
+    company_id = session.get('company_id')
+    company_ref = db.collection('companies').document(company_id)
+    
+    # Obtener una referencia a la colección de Firestore
+    survey_results_ref = company_ref.collection('survey results')
+    
+    # Obtener un objeto QuerySnapshot
+    query_snapshot = survey_results_ref.get()
+    
+    # Extraer los campos de cada documento y almacenarlos en una lista de diccionarios
+    survey_results_data = []
+    for doc in query_snapshot:
+        doc_data = doc.to_dict()
+        survey_results_data.append({
+            'template_name': doc_data['template name'],
+            'score': doc_data['score'],
+            'timestamp': doc_data['timestamp'],
+        })
+    
+    # Pasar la lista de diccionarios a la plantilla
+    return render_template('survey_results.html', survey_results_data=survey_results_data)
+
+
+
 
 @app.route("/catalog")
 def catalog():
     return render_template('catalog.html', title='Flight Confirmation Demo for Python', flights=get_flights())
 
 async def store_sent_survey(company_id, template_name, recipient_wa_id, message_id):
-    try:
-        doc_ref = db.collection('companies').document(company_id).collection('surveys sent').document()
-        doc_ref.set({
-            'template_name': template_name,
-            'recipient_wa_id': recipient_wa_id,
-            'timestamp': datetime.utcnow(),
-            'message_id': message_id
-        })
-        print(f"Stored sent survey for {recipient_wa_id} in company {company_id}")
-    except Exception as e:
-        print(f"Error storing sent survey: {e}")
+    if message_id:
+        try:
+            doc_ref = db.collection('companies').document(company_id).collection('surveys sent').document()
+            doc_ref.set({
+                'template_name': template_name,
+                'recipient_wa_id': recipient_wa_id,
+                'timestamp': datetime.utcnow(),
+                'message_id': message_id
+            })
+            print(f"Stored sent survey for {recipient_wa_id} in company {company_id}")
+        except Exception as e:
+            print(f"Error storing sent survey: {e}")
+    else:
+        print("Message ID is empty, nothing to store.")
+
 
 @app.route("/buy-ticket", methods=['POST'])
 async def buy_ticket():
@@ -424,6 +495,7 @@ async def send_to_employee(employee_wa_id):
             print(f"Pulse survey ID: {pulse_survey_id}, template name: {template_name}")
             
             data = send_pulse_survey(recipient_phone_number, template_name)
+            print('sending: ', data)
             message_id = await send_message(data)
             await store_sent_survey(company_id, template_name, recipient_phone_number, message_id)
             print(f"Access token: {config['ACCESS_TOKEN']}")
@@ -433,10 +505,18 @@ async def send_to_employee(employee_wa_id):
             # Wait for one minute before sending the next message
             time.sleep(5)
 
+        flash('Mensajes enviados correctamente', 'alert-success')
+
     except Exception as e:
         traceback.print_exc()
         print(f"Error sending message: {e}")
         print(f"Access token: {config['ACCESS_TOKEN']}")
+        flash('Ha ocurrido un error al enviar los mensajes', 'alert-danger')
+
+    return redirect(url_for('employees'))
+    
+
+
 
 @app.route('/update-pulse-survey', methods=['POST'])
 def update_pulse_survey():
@@ -452,3 +532,4 @@ def update_pulse_survey():
     })
 
     return redirect(url_for('surveys'))
+
