@@ -49,6 +49,196 @@ app.config['ACCESS_TOKEN'] = os.environ['ACCESS_TOKEN']
 def index():
     return render_template('index.html', name=__name__)
 
+#
+#
+# BACK
+# END
+# FUNCTIONS
+#
+#
+
+
+#@app.route('/webhook', methods=['GET'])
+#def webhook_verification():
+#    if request.args.get('hub.verify_token') == '12345':
+#        return request.args.get('hub.challenge')
+#    return "Error verifying token"
+
+@app.route('/webhook', methods=['POST'])
+def webhook_verification():
+    message_data = request.get_json()
+    print(f'Message data: {message_data}')  # Agrega esta línea para imprimir los datos del mensaje
+    handle_whatsapp_messages(message_data)
+    return "ok"
+    
+import re
+
+def handle_whatsapp_messages(message_data):
+    if 'entry' in message_data:
+        entries = message_data['entry']
+        for entry in entries:
+            if 'changes' in entry:
+                changes = entry['changes']
+                for change in changes:
+                    if 'value' in change:
+                        value = change['value']
+                        if 'messages' in value:
+                            messages = value['messages']
+                            for message in messages:
+                                if 'from' in message:
+                                    sender = message['from']
+                                    text = None
+                                    unique_message_id = None
+                                    sent_message_id = None
+                                    if 'text' in message:
+                                        text = message['text']['body']
+                                        if 'context' in message:
+                                            unique_message_id = message['context']['id']
+                                    elif 'button' in message:
+                                        text = message['button']['text']
+                                        if 'id' in message:
+                                            unique_message_id = message['id']
+                                        if 'context' in message:
+                                            sent_message_id = message['context']['id']
+                                    
+                                    if text is not None:
+                                        print(f'Mensaje recibido de {sender}: {text}')
+                                        
+                                        # Extract the name of the sender
+                                        name = None
+                                        company_id = None
+                                        if '@' in text:
+                                            print("Encontró arroba en el texto")
+                                            match = re.search(r'@(\S+)\b', text)
+                                            if match:
+                                                company_id = match.group(1)
+                                                print("company id seteado:", company_id)
+                                            else:
+                                                print("No se encontró el company id")
+                                            if 'contacts' in value and len(value['contacts']) > 0:
+                                                name = value['contacts'][0]['profile']['name']
+                                                print("nombre seteado:", name)
+                                            else:
+                                                print("No se pudo establecer el nombre")
+                                            print("arroba en texto")
+                                        else:
+                                            print("No se encontró arroba en el texto")
+
+                                        if name and company_id:
+                                            store_employee(company_id, name, sender)
+                                            print("Guardando empleado")
+                                        else:
+                                            print("No se pudo guardar el empleado")
+
+                                        if text[0].isdigit() and sent_message_id:
+                                            print("Guardando survey answer")
+                                            print("sent_message_id =", sent_message_id)
+                                            store_survey_answer(sender, text, sent_message_id)
+                                        else:
+                                            print("No se pudo guardar la respuesta de la encuesta")
+
+
+
+
+def find_company_id_by_wa_id(wa_id):
+    db = firestore.Client()
+    companies_ref = db.collection('companies')
+    companies = companies_ref.stream()
+
+    for company in companies:
+        company_id = company.id
+        employees_ref = db.collection('companies').document(company_id).collection('employees')
+        employees = employees_ref.where('wa_id', '==', wa_id).stream()
+
+        for employee in employees:
+            return company_id
+
+    return None
+
+
+
+def store_employee(company_id, name, wa_id):
+    # Reference to the company document and the employees collection
+    company_ref = db.collection('companies').document(company_id)
+    employees_ref = company_ref.collection('employees')
+    
+    # Check if the company document exists
+    if not company_ref.get().exists:
+        return
+
+    # Check if an employee with the given wa_id already exists
+    existing_employee = employees_ref.where('wa_id', '==', wa_id).stream()
+
+    # If the employee exists, we don't want to add them again, so just return
+    for employee in existing_employee:
+        return
+    
+    # If the employee does not exist, create a new employee document
+    new_employee = {
+        'name': name,
+        'wa_id': wa_id
+    }
+
+    # Add the new employee document to the employees collection
+    employees_ref.add(new_employee)
+
+
+def store_survey_answer(wa_id, answer, sent_message_id):
+    companies_ref = db.collection('companies')
+    company_id = None
+    for company in companies_ref.stream():
+        employees_ref = db.collection('companies').document(company.id).collection('employees').where('wa_id', '==', wa_id)
+        for employee in employees_ref.stream():
+            company_id = company.id
+    if company_id is not None:
+        doc_ref = db.collection('companies').document(company_id).collection('survey answers')
+        doc_ref.add({
+            'wa_id': wa_id,
+            'answer': answer,
+            'message_id' : sent_message_id
+        })
+        
+        # Call pulse_survey_results function to store survey results
+        pulse_survey_results(company_id, answer, sent_message_id)
+
+    else:
+        print(f"No se encontró el empleado con el wa_id {wa_id} en ninguna empresa")
+
+
+
+def pulse_survey_results(company_id, answer, sent_message_id):
+    company_ref = db.collection('companies').document(company_id)
+    surveys_sent_ref = company_ref.collection('surveys sent').where('message_id', '==', sent_message_id).get()
+    
+    for survey_sent_doc in surveys_sent_ref:
+        survey_sent = survey_sent_doc.to_dict()
+        timestamp = datetime.now()
+        survey_results_ref = company_ref.collection('survey results')
+        survey_results_ref.add({
+            'template name': survey_sent['template_name'],
+            'answer': answer,
+            'message_id': sent_message_id,
+            'timestamp': timestamp
+        })
+
+def get_company_id_by_email(user_email):
+    companies_ref = db.collection("companies")
+    query = companies_ref.where("email", "==", user_email).limit(1)
+    result = query.stream()
+    
+    for doc in result:
+        return doc.id
+
+    return None
+
+#
+#
+# FRONT
+# END
+# FUNCTIONS
+#
+#
+
 @app.route("/welcome")
 def welcome():
     return render_template('welcome.html')
@@ -74,7 +264,7 @@ def login():
         else:
             print("No se encontró el company_id para el usuario.")
         
-        return flask.redirect(flask.url_for('catalog'))
+        return flask.redirect(flask.url_for('employees'))
     except Exception as e:
         print(e)
         return redirect(url_for('index'))
@@ -82,16 +272,6 @@ def login():
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-def get_company_id_by_email(user_email):
-    companies_ref = db.collection("companies")
-    query = companies_ref.where("email", "==", user_email).limit(1)
-    result = query.stream()
-    
-    for doc in result:
-        return doc.id
-
-    return None
 
 
 #google firebase create new users
@@ -189,7 +369,6 @@ def surveys():
     return render_template('surveys.html', pulse_surveys=pulse_surveys)
 
 
-
 @app.route("/catalog")
 def catalog():
     return render_template('catalog.html', title='Flight Confirmation Demo for Python', flights=get_flights())
@@ -259,148 +438,6 @@ async def send_to_employee(employee_wa_id):
         print(f"Error sending message: {e}")
         print(f"Access token: {config['ACCESS_TOKEN']}")
 
-
-
-
-#@app.route('/webhook', methods=['GET'])
-#def webhook_verification():
-#    if request.args.get('hub.verify_token') == '12345':
-#        return request.args.get('hub.challenge')
-#    return "Error verifying token"
-
-@app.route('/webhook', methods=['POST'])
-def webhook_verification():
-    message_data = request.get_json()
-    print(f'Message data: {message_data}')  # Agrega esta línea para imprimir los datos del mensaje
-    handle_whatsapp_messages(message_data)
-    return "ok"
-    
-def handle_whatsapp_messages(message_data):
-    if 'entry' in message_data:
-        entries = message_data['entry']
-        for entry in entries:
-            if 'changes' in entry:
-                changes = entry['changes']
-                for change in changes:
-                    if 'value' in change:
-                        value = change['value']
-                        if 'messages' in value:
-                            messages = value['messages']
-                            for message in messages:
-                                if 'from' in message:
-                                    sender = message['from']
-                                    text = None
-                                    message_id = None
-                                    if 'text' in message:
-                                        text = message['text']['body']
-                                        message_id = message['context']['id']
-                                    elif 'button' in message:
-                                        text = message['button']['text']
-                                        message_id = message['id']
-                                    
-                                    if text is not None:
-                                        print(f'Mensaje recibido de {sender}: {text}')
-                                        
-                                        # Extract the name of the sender
-                                        name = None
-                                        company_id = None
-                                        if '@' in text:
-                                            print("Encontró arroba en el texto")
-                                            match = re.search(r'@(\S+)\b', text)
-                                            if match:
-                                                company_id = match.group(1)
-                                                print("company id seteado:", company_id)
-                                            else:
-                                                print("No se encontró el company id")
-                                            if 'contacts' in value and len(value['contacts']) > 0:
-                                                name = value['contacts'][0]['profile']['name']
-                                                print("nombre seteado:", name)
-                                            else:
-                                                print("No se pudo establecer el nombre")
-                                            print("arroba en texto")
-                                        else:
-                                            print("No se encontró arroba en el texto")
-
-                                        if name and company_id:
-                                            store_employee(company_id, name, sender)
-                                            print("Guardando empleado")
-                                        else:
-                                            print("No se pudo guardar el empleado")
-
-                                        if text[0].isdigit() and message_id:
-                                            store_survey_answer(sender, text, message_id)
-                                            print("Guardando survey answer")
-                                        else:
-                                            print("No se pudo guardar la respuesta de la encuesta")
-
-
-
-
-def find_company_id_by_wa_id(wa_id):
-    db = firestore.Client()
-    companies_ref = db.collection('companies')
-    companies = companies_ref.stream()
-
-    for company in companies:
-        company_id = company.id
-        employees_ref = db.collection('companies').document(company_id).collection('employees')
-        employees = employees_ref.where('wa_id', '==', wa_id).stream()
-
-        for employee in employees:
-            return company_id
-
-    return None
-
-
-
-def store_employee(company_id, name, wa_id):
-    # Reference to the company document and the employees collection
-    company_ref = db.collection('companies').document(company_id)
-    employees_ref = company_ref.collection('employees')
-    
-    # Check if the company document exists
-    if not company_ref.get().exists:
-        return
-
-    # Check if an employee with the given wa_id already exists
-    existing_employee = employees_ref.where('wa_id', '==', wa_id).stream()
-
-    # If the employee exists, we don't want to add them again, so just return
-    for employee in existing_employee:
-        return
-    
-    # If the employee does not exist, create a new employee document
-    new_employee = {
-        'name': name,
-        'wa_id': wa_id
-    }
-
-    # Add the new employee document to the employees collection
-    employees_ref.add(new_employee)
-
-
-def store_survey_answer(wa_id, answer):
-    companies_ref = db.collection('companies').stream()
-    company_id = None
-    for company in companies_ref:
-        employees_ref = db.collection('companies').document(company.id).collection('employees').where('wa_id', '==', wa_id).stream()
-        for employee in employees_ref:
-            company_id = company.id
-    if company_id is not None:
-        doc_ref = db.collection('companies').document(company_id).collection('survey answers')
-        doc_ref.add({
-            'wa_id': wa_id,
-            'answer': answer
-        })
-        
-        # Call pulse_survey_results function to store survey results
-        pulse_survey_results(company_id, answer)
-
-    else:
-        print(f"No se encontró el empleado con el wa_id {wa_id} en ninguna empresa") 
-
-
-
 @app.route('/update-pulse-survey', methods=['POST'])
 def update_pulse_survey():
     company_id = request.form['company_id']
@@ -415,31 +452,3 @@ def update_pulse_survey():
     })
 
     return redirect(url_for('surveys'))
-
-
-def pulse_survey_results(company_id, answer):
-    # Get the reference to the survey sent collection
-    survey_sent_ref = db.collection('companies').document(company_id).collection('surveys sent')
-    survey_sent_data = survey_sent_ref.stream()
-
-    # Look for the message_id of the survey answer in the survey sent collection
-    message_id = None
-    template_name = None
-    for doc in survey_sent_data:
-        survey_sent_answer = doc.get('survey_answer')
-        if survey_sent_answer and survey_sent_answer == answer:
-            message_id = doc.get('message_id')
-            template_name = doc.get('template_name')
-            break
-
-    if message_id and template_name:
-        # Save the survey results in the pulse survey results collection
-        pulse_survey_results_ref = db.collection('companies').document(company_id).collection('pulse survey results')
-        pulse_survey_results_ref.add({
-            'template_name': template_name,
-            'answer': answer,
-            'timestamp': datetime.datetime.now(),
-            'message_id': message_id
-        })
-    else:
-        print(f"No se encontró el mensaje para la respuesta de la encuesta {answer}")
