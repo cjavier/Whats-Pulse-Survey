@@ -6,3 +6,4 @@ asgiref
 aioflask
 firebase-admin
 google-cloud-firestore
+jinja2==3.0.2

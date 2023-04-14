@@ -2,25 +2,37 @@
 
 {% block content %}
 
-<table class="table">
-  <thead>
-    <tr>
-      <th>Template Name</th>
-      <th>Score</th>
-      <th>Timestamp</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for result in survey_results_data %}
-      <tr>
-        <td>{{ result['template_name'] }}</td>
-        <td>{{ result['score'] }}</td>
-        <td>{{ result['timestamp'] }}</td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
+{% set grouped_results = {} %}
 
+{% for result in survey_results_data %}
+  {% set template_name = result['template_name'] %}
+  {% if template_name not in grouped_results %}
+    {% set grouped_results = grouped_results|default({}) %}
+    {% set _ = grouped_results.update({template_name: []}) %}
+  {% endif %}
+  {% set _ = grouped_results[template_name].append(result) %}
+{% endfor %}
 
+{% for template_name, results in grouped_results.items() %}
+  <h3>{{ template_name }}</h3>
+    <table class="table">
+        <thead>
+            <tr>
+                <th># of responses</th>
+                <th>Average Score</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ results|length }}</td>
+                {% if results|length %}
+  <td>{{ results|map(attribute='score')|sum / results|length }}</td>
+{% else %}
+  <td>N/A</td>
+{% endif %}
+            </tr>
+        </tbody>
+    </table>
+{% endfor %}
 
 {% endblock %}

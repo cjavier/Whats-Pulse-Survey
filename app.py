@@ -9,7 +9,7 @@ import hashlib
 from config import config
 import traceback
 import firebase_admin
-from firebase_admin import auth, credentials
+from firebase_admin import auth, credentials, firestore
 from google.auth import load_credentials_from_file
 import google.auth
 from google.cloud import firestore
@@ -17,6 +17,8 @@ from google.oauth2 import service_account
 from datetime import datetime
 import time
 import re
+from builtins import sum
+
 
 
 
@@ -299,6 +301,9 @@ def register():
                 display_name=display_name
             )
             create_business(handle, email, business_name)
+            # Login the user
+            user = auth.sign_in_with_email_and_password(email, password)
+            session['user'] = user
             return redirect(url_for('employees'))
         except Exception as e:
             print(e)
