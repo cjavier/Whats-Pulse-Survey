@@ -41,6 +41,8 @@ db = firestore.Client(credentials=creds)
 
 app = Flask(__name__)
 app.secret_key = 'asdf93kasf83q98ccqh9'  # Reemplaza con una clave secreta para proteger las sesiones.
+ACTIVATION_KEY = '123456789'
+
  
 with open('config.json') as f:
     config = json.load(f)
@@ -60,6 +62,19 @@ def index():
 # FUNCTIONS
 #
 #
+@app.route('/webhook-activador', methods=['POST'])
+async def webhook_activador():
+    # Obtén la llave y el ID del cuerpo de la solicitud
+    request_data = request.get_json()
+    key = request_data.get('key')
+    company_id = request_data.get('id')
+
+    # Verifica si la llave proporcionada coincide con la llave definida
+    if key == ACTIVATION_KEY:  # Si utilizas la llave definida directamente en el código
+        await send_to_all_employees(company_id)
+        return jsonify({'status': 'success', 'message': 'La función send_to_all_employees fue ejecutada correctamente'})
+    else:
+        return jsonify({'status': 'error', 'message': 'La llave proporcionada no coincide con la llave definida'}), 403
 
 
 #@app.route('/webhook', methods=['GET'])
@@ -250,10 +265,6 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
-@app.route("/welcome")
-def welcome():
-    return render_template('welcome.html')
-
 #google firebase autentication
 @app.route('/login', methods=['POST'])
 def login():
@@ -357,93 +368,6 @@ def get_company_employees(company_id):
 
     return employees_list
 
-@app.route('/survey-answers')
-def survey_answers():
-    # Reemplaza 'Companies' y 'survey answers' con los nombres de tus colecciones en Firestore
-    companies_ref = db.collection('companies')
-    company_id = session.get('company_id')
-    if company_id is None:
-        return "No se encontró el company_id en la sesión.", 400
-
-    survey_answers_ref = companies_ref.document(company_id).collection('survey answers')
-    survey_answers_data = survey_answers_ref.stream()
-
-    survey_answers = []
-    for doc in survey_answers_data:
-        answer_data = doc.to_dict()
-        answer_data['id'] = doc.id
-        survey_answers.append(answer_data)
-
-    return render_template('survey_answers.html', survey_answers=survey_answers)
-
-
-@app.route('/surveys-sent')
-def surveys_sent():
-    # Reemplaza 'Companies' y 'surveys sent' con los nombres de tus colecciones en Firestore
-    companies_ref = db.collection('companies')
-    company_id = session.get('company_id')
-    if company_id is None:
-        return "No se encontró el company_id en la sesión.", 400
-
-    surveys_sent_ref = companies_ref.document(company_id).collection('surveys sent')
-    surveys_sent_data = surveys_sent_ref.stream()
-
-    surveys_sent = []
-    for doc in surveys_sent_data:
-        survey_data = doc.to_dict()
-        survey_data['id'] = doc.id
-        surveys_sent.append(survey_data)
-
-    return render_template('surveys_sent.html', surveys_sent=surveys_sent)
-
-@app.route('/surveys')
-def surveys():
-    companies_ref = db.collection('companies')
-    company_id = session.get('company_id')
-    if company_id is None:
-        return "No se encontró el company_id en la sesión.", 400
-
-    pulse_surveys_ref = companies_ref.document(company_id).collection('pulse surveys')
-    pulse_surveys_data = pulse_surveys_ref.stream()
-
-    pulse_surveys = []
-    for doc in pulse_surveys_data:
-        survey_data = doc.to_dict()
-        survey_data['id'] = doc.id
-        pulse_surveys.append(survey_data)
-
-    return render_template('surveys.html', pulse_surveys=pulse_surveys)
-
-@app.route('/survey-results')
-def survey_results():
-    company_id = session.get('company_id')
-    company_ref = db.collection('companies').document(company_id)
-    
-    # Obtener una referencia a la colección de Firestore
-    survey_results_ref = company_ref.collection('survey results')
-    
-    # Obtener un objeto QuerySnapshot
-    query_snapshot = survey_results_ref.get()
-    
-    # Extraer los campos de cada documento y almacenarlos en una lista de diccionarios
-    survey_results_data = []
-    for doc in query_snapshot:
-        doc_data = doc.to_dict()
-        survey_results_data.append({
-            'template_name': doc_data['template name'],
-            'score': doc_data['score'],
-            'timestamp': doc_data['timestamp'],
-        })
-    
-    # Pasar la lista de diccionarios a la plantilla
-    return render_template('survey_results.html', survey_results_data=survey_results_data)
-
-
-
-
-@app.route("/catalog")
-def catalog():
-    return render_template('catalog.html', title='Flight Confirmation Demo for Python', flights=get_flights())
 
 async def store_sent_survey(company_id, template_name, recipient_wa_id, message_id):
     if message_id:
@@ -462,31 +386,9 @@ async def store_sent_survey(company_id, template_name, recipient_wa_id, message_
         print("Message ID is empty, nothing to store.")
 
 
-@app.route("/buy-ticket", methods=['POST'])
-async def buy_ticket():
-    recipient_phone_number = app.config['RECIPIENT_WAID']
-    data = send_quick_reply_message(recipient_phone_number)
-    template_name = "quick_reply_template"  # Replace with the actual template name
-
-    try:
-        await send_message(data)
-        print(f"Access token: {config['ACCESS_TOKEN']}")
-        print(f"Recipient waid: {config['RECIPIENT_WAID']}")
-        print(company_id)
-
-        await store_sent_survey(company_id, template_name, recipient_phone_number)
-    except Exception as e:
-        traceback.print_exc()
-        print(f"Error sending message: {e}")
-        print(f"Access token: {config['ACCESS_TOKEN']}")
-
-    return flask.redirect(flask.url_for('catalog'))
-
-
-@app.route("/send-to-employee/<int:employee_wa_id>", methods=['POST'])
-async def send_to_employee(employee_wa_id):
+@app.route("/send-to-employee/<int:employee_wa_id>/<company_id>", methods=['POST'])
+async def send_to_employee(employee_wa_id, company_id):
     recipient_phone_number = employee_wa_id
-    company_id = session.get('company_id')
 
     try:
         # Get the reference to the pulse surveys collection
@@ -497,44 +399,36 @@ async def send_to_employee(employee_wa_id):
         for doc in pulse_surveys_data:
             pulse_survey_id = doc.id
             template_name = doc.get('template')
-            print(f"Pulse survey ID: {pulse_survey_id}, template name: {template_name}")
-            
-            data = send_pulse_survey(recipient_phone_number, template_name)
-            print('sending: ', data)
-            message_id = await send_message(data)
-            await store_sent_survey(company_id, template_name, recipient_phone_number, message_id)
-            print(f"Access token: {config['ACCESS_TOKEN']}")
-            print(f"Recipient waid: {recipient_phone_number}")
-            print(f"message_is: {message_id}")
+            active = doc.get('active')
 
-            # Wait for one minute before sending the next message
-            time.sleep(5)
+            if active:
+                print(f"Pulse survey ID: {pulse_survey_id}, template name: {template_name}")
+                
+                data = send_pulse_survey(recipient_phone_number, template_name)
+                print('sending: ', data)
+                message_id = await send_message(data)
+                await store_sent_survey(company_id, template_name, recipient_phone_number, message_id)
+                print(f"Access token: {config['ACCESS_TOKEN']}")
+                print(f"Recipient waid: {recipient_phone_number}")
+                print(f"message_is: {message_id}")
 
-        flash('Mensajes enviados correctamente', 'alert-success')
+                # Wait for one minute before sending the next message
+                time.sleep(1)
+
+        return flash('Mensajes enviados correctamente', 'alert-success')
 
     except Exception as e:
         traceback.print_exc()
         print(f"Error sending message: {e}")
         print(f"Access token: {config['ACCESS_TOKEN']}")
-        flash('Ha ocurrido un error al enviar los mensajes', 'alert-danger')
-
-    return redirect(url_for('employees'))
-    
+        return flash('Ha ocurrido un error al enviar los mensajes', 'alert-danger')
 
 
 
-@app.route('/update-pulse-survey', methods=['POST'])
-def update_pulse_survey():
-    company_id = request.form['company_id']
-    survey_id = request.form['survey_id']
-    activo = request.form.get('activo') == 'on'
+async def send_to_all_employees(company_id):
+    employees_list = get_company_employees(company_id)
+    for employee in employees_list:
+        wa_id = employee['wa_id']
+        send_to_employee(wa_id, company_id)
 
-    company_ref = db.collection('companies').document(company_id)
-    survey_ref = company_ref.collection('pulse surveys').document(survey_id)
-
-    survey_ref.update({
-        'activo': activo
-    })
-
-    return redirect(url_for('surveys'))
 
