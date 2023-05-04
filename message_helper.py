@@ -3,28 +3,33 @@ import json
 from flask import current_app
 
 async def send_message(data):
-  headers = {
-    "Content-type": "application/json",
-    "Authorization": f"Bearer {current_app.config['ACCESS_TOKEN']}",
+    session = aiohttp.ClientSession()
+    
+    headers = {
+        "Content-type": "application/json",
+        "Authorization": f"Bearer {current_app.config['ACCESS_TOKEN']}",
     }
-  
-  async with aiohttp.ClientSession() as session:
+    
     url = 'https://graph.facebook.com' + f"/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
     try:
-      async with session.post(url, data=data, headers=headers) as response:
-        if response.status == 200:
-          print("Status:", response.status)
-          print("Content-type:", response.headers['content-type'])
+        async with session.post(url, data=data, headers=headers) as response:
+            if response.status == 200:
+                print("Status:", response.status)
+                print("Content-type:", response.headers['content-type'])
 
-          json_response = await response.json()
-          message_id = json_response['messages'][0]['id']
-          print("Message ID:", message_id)
-          return message_id
-        else:
-          print(response.status)        
-          print(response)        
+                json_response = await response.json()
+                message_id = json_response['messages'][0]['id']
+                print("Message ID:", message_id)
+                return message_id
+            else:
+                print(response.status)        
+                print(response)        
     except aiohttp.ClientConnectorError as e:
-      print('Connection Error', str(e))
+        print('Connection Error', str(e))
+    finally:
+        await session.close()
+
+# Rest of the code remains the same
 
 def get_text_message_input(recipient, text):
   return json.dumps({
@@ -101,6 +106,8 @@ def send_quick_reply_message(to_phone_number):
    }
 }
   )
+async def close_session():
+    await session.close()
 
 def send_pulse_survey(to_phone_number, template_name):
     return json.dumps(

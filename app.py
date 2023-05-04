@@ -402,7 +402,6 @@ async def send_to_employee(employee_wa_id, company_id):
             pulse_survey_id = doc.id
             template_name = doc.get('template')
             active = doc.get('active')
-            print("survey cicly initiated")
 
             if active:
                 print(f"Pulse survey ID: {pulse_survey_id}, template name: {template_name}")
@@ -416,7 +415,7 @@ async def send_to_employee(employee_wa_id, company_id):
                 print(f"message_is: {message_id}")
 
                 # Wait for one minute before sending the next message
-                time.sleep(1)
+                #time.sleep(1)
 
         return jsonify({"status": "success", "message": "Mensajes enviados correctamente"})
 
