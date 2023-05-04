@@ -434,6 +434,6 @@ async def send_to_all_employees(company_id):
     for employee in employees_list:
         wa_id = employee['wa_id']
         print("sending to ", wa_id)
-        send_to_employee(wa_id, company_id)
+        await send_to_employee(wa_id, company_id)
 
 
