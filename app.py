@@ -386,7 +386,7 @@ async def store_sent_survey(company_id, template_name, recipient_wa_id, message_
         print("Message ID is empty, nothing to store.")
 
 
-@app.route("/send-to-employee/<int:employee_wa_id>/<company_id>", methods=['POST'])
+#@app.route("/send-to-employee/<int:employee_wa_id>/<company_id>", methods=['POST'])
 async def send_to_employee(employee_wa_id, company_id):
     recipient_phone_number = employee_wa_id
 
