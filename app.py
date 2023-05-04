@@ -388,18 +388,21 @@ async def store_sent_survey(company_id, template_name, recipient_wa_id, message_
 
 #@app.route("/send-to-employee/<int:employee_wa_id>/<company_id>", methods=['POST'])
 async def send_to_employee(employee_wa_id, company_id):
+    print("sending started for ", employee_wa_id)
     recipient_phone_number = employee_wa_id
 
     try:
         # Get the reference to the pulse surveys collection
         pulse_surveys_ref = db.collection('companies').document(company_id).collection('pulse surveys')
         pulse_surveys_data = pulse_surveys_ref.stream()
+        print("surveys found")
 
         # Iterate over the documents in the collection to send a message for each survey
         for doc in pulse_surveys_data:
             pulse_survey_id = doc.id
             template_name = doc.get('template')
             active = doc.get('active')
+            print("survey cicly initiated")
 
             if active:
                 print(f"Pulse survey ID: {pulse_survey_id}, template name: {template_name}")
@@ -415,18 +418,18 @@ async def send_to_employee(employee_wa_id, company_id):
                 # Wait for one minute before sending the next message
                 time.sleep(1)
 
-        return flash('Mensajes enviados correctamente', 'alert-success')
+        return jsonify({"status": "success", "message": "Mensajes enviados correctamente"})
 
     except Exception as e:
         traceback.print_exc()
         print(f"Error sending message: {e}")
         print(f"Access token: {config['ACCESS_TOKEN']}")
-        return flash('Ha ocurrido un error al enviar los mensajes', 'alert-danger')
+        return jsonify({"status": "error", "message": "Ha ocurrido un error al enviar los mensajes"})
 
 
 
 async def send_to_all_employees(company_id):
-    print("sending to all employees")
+    print("sending to all employees of ", company_id)
     employees_list = get_company_employees(company_id)
     for employee in employees_list:
         wa_id = employee['wa_id']
